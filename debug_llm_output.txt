@@ -1,0 +1,17 @@
+```json
+
+{
+
+  "task": "write_letter",
+
+  "tone": "formal",
+
+  "duration": "2 days",
+
+  "output_format": "pdf",
+
+  "destination": "desktop"
+
+}
+
+```
