@@ -31,9 +31,11 @@ Given a user command, output only a valid JSON object with the following keys:
 
     command = f"{system_prompt}\n\nUser: {prompt}"
 
+    output = ""  # initialize early to avoid undefined errors
+
     try:
         result = subprocess.run(
-            ["ollama", "run", "phi3"],
+            ["ollama", "run", "mistral"],
             input=command.encode(),
             capture_output=True,
             timeout=90
@@ -48,10 +50,11 @@ Given a user command, output only a valid JSON object with the following keys:
 
     except Exception as e:
         print("LLM JSON extraction failed:")
-        print(output)
+        if output:
+            print(output)
+        else:
+            print("No output received from subprocess.")
         raise e
-
-
 
 
 def get_letter_content(prompt: str) -> str:
@@ -60,7 +63,7 @@ def get_letter_content(prompt: str) -> str:
     Used to generate the actual letter content after task parsing.
     """
     result = subprocess.run(
-        ["ollama", "run", "phi3"],
+        ["ollama", "run", "mistral"],
         input=prompt.encode(),
         capture_output=True,
         timeout=90
