@@ -4,7 +4,7 @@
 
 ## Features
 
-- Local LLM processing using Ollama (Phi-3)
+- Local LLM processing using Ollama 
 - Parses structured intent from natural language
 - Generates formatted letter content
 - Creates `.docx` using `python-docx`
