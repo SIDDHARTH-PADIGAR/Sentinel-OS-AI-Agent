@@ -1,58 +1,71 @@
-import os
-import tempfile
-import subprocess
 from docx import Document
-from llm.local_llm import get_letter_content
-from utils.win_tools import get_desktop_path
+import os
+import time
+import re
+import traceback
+import win32com.client
 
-def create_letter(task):
-    print("Writing letter...")
+def sanitize_filename(text: str) -> str:
+    text = text.strip().lower()
+    text = re.sub(r"[\\/*?\"<>|]", "_", text)
+    return text.replace(" ", "_")
 
-    content_prompt = f"Write a {task['tone']} leave letter for {task['duration']}."
+def write_document(payload: dict) -> str:
+    print(f"--- Incoming Payload ---\n{payload}\n")
+
+    title = payload.get("title") or "untitled"
+    content = payload.get("content")
+    file_format = (payload.get("format") or "word").strip().lower()
+
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("No valid content provided.")
+
+    sanitized_title = sanitize_filename(title)
+    timestamp = int(time.time())
+    base_filename = f"{sanitized_title}_{file_format}_{timestamp}"
+
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+    os.makedirs(desktop, exist_ok=True)
+
+    docx_path = os.path.join(desktop, f"{base_filename}.docx")
+    pdf_path = os.path.join(desktop, f"{base_filename}.pdf")
+    file_path = docx_path
+
+    # Write to .docx
     try:
-        content = get_letter_content(content_prompt)
+        doc = Document()
+        for line in content.strip().split("\n"):
+            doc.add_paragraph(line)
+        doc.save(docx_path)
+        print(f"Saved DOCX: {docx_path}")
     except Exception as e:
-        print("Failed to get content from Mistral:")
-        print(e)
-        return
+        print(f"Error saving .docx: {e}")
+        raise
 
-    # Step 1: Save draft to temp file
-    draft_path = os.path.join(tempfile.gettempdir(), "leave_letter_draft.docx")
-    doc = Document()
-    doc.add_paragraph(content)
-    doc.save(draft_path)
-    print(f"Draft saved to temp: {draft_path}")
-
-    # Step 2: Open Word for review
-    try:
-        os.startfile(draft_path)  # opens in MS Word
-    except Exception as e:
-        print("Failed to open draft in Word:")
-        print(e)
-        return
-
-    # Step 3: Wait for user confirmation
-    input("\nReview the letter. Press Enter to finalize and save...")
-
-    # Step 4: Save final .docx
-    desktop = get_desktop_path() if task["destination"] == "desktop" else task["destination"]
-    destination_path = os.path.join(desktop, "leave_letter.docx")
-    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
-
-    try:
-        doc.save(destination_path)
-        print(f"Final .docx saved at: {destination_path}")
-    except Exception as e:
-        print("Failed to save final .docx:")
-        print(e)
-        return
-
-    # Step 5: Convert to PDF if requested
-    if task["output_format"].lower() == "pdf":
+    # Convert to PDF
+    if file_format == "pdf":
         try:
-            from docx2pdf import convert
-            convert(destination_path)
-            print("Converted to PDF.")
+            print("Attempting PDF conversion via Word...")
+            import win32com.client
+            word = win32com.client.Dispatch("Word.Application")
+            word.Visible = False
+            pdf_doc = word.Documents.Open(docx_path)
+            pdf_doc.SaveAs(pdf_path, FileFormat=17)
+            pdf_doc.Close()
+            word.Quit()
+            file_path = pdf_path
+            print(f"Saved PDF: {pdf_path}")
         except Exception as e:
-            print("PDF conversion failed:")
-            print(e)
+            print("!!! PDF conversion failed. Falling back to .docx")
+            traceback.print_exc()
+            file_path = docx_path
+
+    # Try to open the file
+    try:
+        os.startfile(file_path)
+    except Exception as e:
+        print(f"Could not open file automatically: {e}")
+
+    print("\nPress ENTER after reviewing the document...", end='', flush=True)
+    input()
+    return file_path

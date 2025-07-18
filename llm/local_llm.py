@@ -1,72 +1,55 @@
-import subprocess
-import json
-import re
-
-def extract_json(text):
-    try:
-        matches = re.findall(r"\{.*?\}", text, re.DOTALL)
-        longest = max(matches, key=len)
-        return json.loads(longest)
-    except Exception as e:
-        print("Failed to extract valid JSON from LLM output:")
-        print(text)
-        raise e
-
 def parse_task(prompt: str) -> dict:
-    system_prompt = """
-You are a strict JSON generator.
-
-Given a user command, output only a valid JSON object with the following keys:
-
-- task (string): e.g., "write_letter"
-- tone (string): e.g., "formal"
-- duration (string): e.g., "2 days"
-- output_format (string): e.g., "pdf"
-- destination (string): e.g., "desktop"
-
-🚫 Do NOT add extra commentary or explanation.
-🚫 Do NOT mention constraints.
-✅ Just output JSON. Nothing else.
-"""
-
-    command = f"{system_prompt}\n\nUser: {prompt}"
-
-    output = ""  # initialize early to avoid undefined errors
-
-    try:
-        result = subprocess.run(
-            ["ollama", "run", "mistral"],
-            input=command.encode(),
-            capture_output=True,
-            timeout=90
-        )
-
-        output = result.stdout.decode().strip()
-
-        with open("debug_llm_output.txt", "w", encoding="utf-8") as f:
-            f.write(output)
-
-        return extract_json(output)
-
-    except Exception as e:
-        print("LLM JSON extraction failed:")
-        if output:
-            print(output)
-        else:
-            print("No output received from subprocess.")
-        raise e
-
-
-def get_letter_content(prompt: str) -> str:
     """
-    Sends a plain prompt to the local LLM (phi3 via Ollama) and returns the generated text.
-    Used to generate the actual letter content after task parsing.
+    Returns a dict with:
+    - task_type: what to do (write, summarize, format, etc.)
+    - payload: necessary data for execution
     """
-    result = subprocess.run(
-        ["ollama", "run", "mistral"],
-        input=prompt.encode(),
-        capture_output=True,
-        timeout=90
-    )
+    # MOCK parser — replace with LLM later
+    if "write" in prompt.lower():
+        return {
+            "task_type": "write_document",
+            "payload": {
+                "title": "Generated_Doc.docx",
+                "content": prompt.replace("Write", "").replace("write", "").strip()
+            }
+        }
 
-    return result.stdout.decode().strip()
+    raise ValueError("Task not understood. Try rephrasing.")
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+import requests
+import json
+
+OPEN_ROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
+MODEL = "mistralai/mistral-7b-instruct"
+BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+HEADERS = {
+    "Authorization": f"Bearer {OPEN_ROUTER_API_KEY}",
+    "Content-Type": "application/json",
+}
+
+def call_llm(prompt: str) -> str:
+    body = {
+        "model": MODEL,
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    resp = requests.post(BASE_URL, headers=HEADERS, json=body)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+def parse_task(user_input: str) -> dict:
+    # For now, only support write_document
+    content = call_llm(user_input)
+    return {
+        "task_type": "write_document",
+        "payload": {
+            "title": None,  # can be None, handled downstream
+            "content": content,
+        },
+    }
