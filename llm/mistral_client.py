@@ -1,12 +1,12 @@
 import os
 import requests
 
-OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
+OPEN_ROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
 MODEL = "mistralai/mistral-7b-instruct"
 BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 HEADERS = {
-    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+    "Authorization": f"Bearer {OPEN_ROUTER_API_KEY}",
     "Content-Type": "application/json"
 }
 
