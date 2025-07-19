@@ -26,4 +26,4 @@ Write a formal leave letter for 2 days and save it as PDF on desktop.
 ## Notes
 
 * Word automation is Windows-specific.
-* Timeout errors may occur if the local model is cold or under heavy load. Run `ollama run phi3` once manually before using the assistant.
+  
